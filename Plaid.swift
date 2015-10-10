@@ -7,6 +7,7 @@
 //
 
 import Foundation
+//        import AVFoundation
 
 struct Plaid {
     static var baseURL:String!
@@ -181,25 +182,29 @@ func PS_addUser(userType: ProductType, username: String, password: String, pin: 
             
             
             do {
-                 let jsonResult:NSDictionary? = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
+                if let jsonResult:NSDictionary? = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary {
+                    
 
-            //println("jsonResult: \(jsonResult!)")
-                
-                if let token:String = jsonResult?.valueForKey("access_token") as? String {
-                    if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String:AnyObject]] {
-//                        let mfaTwo = mfaResponse[0]
-                        mfaDict = mfaResponse
-                        if let typeMfa = jsonResult!.valueForKey("type") as? String {
-                            type = typeMfa
+                //println("jsonResult: \(jsonResult!)")
+                    
+                    if let token:String = jsonResult?.valueForKey("access_token") as? String {
+                        if let mfaResponse = jsonResult!.valueForKey("mfa") as? [[String:AnyObject]] {
+    //                        let mfaTwo = mfaResponse[0]
+                            mfaDict = mfaResponse
+                            if let typeMfa = jsonResult!.valueForKey("type") as? String {
+                                type = typeMfa
+                            }
+                            completion(response: response, accessToken: token, mfaType: type, mfa: mfaDict, accounts: nil, transactions: nil, error: error)
+                        } else {
+                            let acctsArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String:AnyObject]]
+                            let accts = acctsArray.map{Account(account: $0)}
+                            let trxnArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String:AnyObject]]
+                            let trxns = trxnArray.map{Transaction(transaction: $0)}
+                            
+//                            print(token)
+                            
+                            completion(response: response, accessToken: token, mfaType: nil, mfa: nil, accounts: accts, transactions: trxns, error: error)
                         }
-                        completion(response: response, accessToken: token, mfaType: type, mfa: mfaDict, accounts: nil, transactions: nil, error: error)
-                    } else {
-                        let acctsArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String:AnyObject]]
-                        let accts = acctsArray.map{Account(account: $0)}
-                        let trxnArray:[[String:AnyObject]] = jsonResult?.valueForKey("transactions") as! [[String:AnyObject]]
-                        let trxns = trxnArray.map{Transaction(transaction: $0)}
-                        
-                        completion(response: response, accessToken: token, mfaType: nil, mfa: nil, accounts: accts, transactions: trxns, error: error)
                     }
                 
                 } else {
@@ -270,27 +275,29 @@ func PS_getUserBalance(accessToken: String, completion: (response: NSURLResponse
     let secret = Plaid.secret!
     
     let urlString:String = "\(baseURL)balance?client_id=\(clientId)&secret=\(secret)&access_token=\(accessToken)"
-    let url:NSURL! = NSURL(string: urlString)
+    let url:NSURL? = NSURL(string: urlString)
     
-    let task = session.dataTaskWithURL(url) {
-        data, response, error in
-//        var error: NSError?
+    let task = session.dataTaskWithURL(url!, completionHandler: { (data, response, error) -> Void in
         
-        let jsonResult:NSDictionary?
         do {
-             jsonResult = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary
+            if let jsonResult:NSDictionary? = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers) as? NSDictionary {
+                
+                if let dataArray:[[String:AnyObject]] = jsonResult?.valueForKey("accounts") as! [[String : AnyObject]] {
+                    let userAccounts = dataArray.map{Account(account: $0)}
+                    completion(response: response, accounts: userAccounts, error: error)
+                
+                }
+//                print(jsonResult)
+
+            }
         
-//            do {
-                let dataArray:[[String:AnyObject]] = jsonResult!.valueForKey("accounts") as! [[String : AnyObject]]
-                let userAccounts = dataArray.map{Account(account: $0)}
-                completion(response: response, accounts: userAccounts, error: error)
-//            } catch let error as NSError {
-                print(error)
-//            }
-        } catch let error as NSError {
+//                            return jsonResult
+        
+        } catch {
             print(error)
         }
-    }
+
+    })
     task.resume()
 }
 
@@ -352,23 +359,41 @@ func plaidDateFormatter(date: NSDate) -> String {
     return dateStr
 }
 
-func dictToString(value: AnyObject) -> NSString {
+func dictToString(dictionary: AnyObject) -> NSString {
 //    if NSJSONSerialization.isValidJSONObject(value) {
+    
+//        let theJSONData = NSJSONSerialization.dataWithJSONObject(
+//            dictionary ,
+//            options: NSJSONWritingOptions(0))
+//        let theJSONText = NSString(data: theJSONData!,
+//            encoding: NSASCIIStringEncoding)
 //        
-//        
+        
 //        do {
-//            if let data = try NSJSONSerialization.dataWithJSONObject(value, options: nil) {
+//            if let data = try NSJSONSerialization.dataWithJSONObject(value, options: NSJSONWritingOptions(0)) {
 //                
 //                
 //                if let string = NSString(data: data, encoding: NSUTF8StringEncoding) {
 //                    return string
-//                }
+//                
 //            }
-//        } catch let error as NSError {
+//        } catch error {
 //            print(error)
 //        }
+        
+//    do {
+//        do {
+//        let data = try NSJSONSerialization.dataWithJSONObject(value, options: NSJSONWritingOptions(rawValue: 0))
+//            let string = NSString(data: data, encoding: NSUTF8StringEncoding)
+//        } catch {
+//            print(error
+//        }
+        
+        return "[]"//dictionary.description
+//    } else {
+//        print(error)
 //    }
-    return value.description
+    
 }
 
 func institutionToString(institution institution: Institution) -> String {
